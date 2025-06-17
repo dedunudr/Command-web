@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en" class="bg-gray-100">
+<head>
+  <meta charset="UTF-8" />
+  <title>Save Comments</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          animation: {
+            fade: 'fadeIn 1s ease-in-out',
+            bounceIn: 'bounceIn 0.8s ease-in-out'
+          },
+          keyframes: {
+            fadeIn: {
+              '0%': { opacity: '0' },
+              '100%': { opacity: '1' },
+            },
+            bounceIn: {
+              '0%': { transform: 'scale(0.5)', opacity: 0 },
+              '100%': { transform: 'scale(1)', opacity: 1 },
+            },
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="p-10 animate-fade">
+  <h1 class="text-3xl font-bold mb-6 text-blue-600 animate-bounceIn">💬 Save Comments</h1>
+  <div class="mb-4 space-x-2 animate-fade">
+    <input id="name" type="text" placeholder="Enter your name" class="border p-2 rounded shadow" />
+    <input id="comment" type="text" placeholder="Enter your comment" class="border p-2 rounded shadow" />
+    <button id="send" class="bg-blue-600 hover:bg-blue-800 text-white p-2 rounded transition-all duration-300">
+      Send
+    </button>
+  </div>
+  <ul id="comments" class="list-inside list-disc p-4 mt-4 bg-white rounded shadow space-y-1 animate-fade">
+  </ul>
+
+  <script>
+    async function loadComments() {
+      const res = await fetch('/comments');
+      const comments = await res.json();
+      const ul = document.getElementById('comments');
+      ul.innerHTML = '';
+      comments.forEach(({ name, comment }) => {
+        const li = document.createElement('li');
+        li.textContent = `${name}: ${comment}`;
+        ul.appendChild(li);
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', loadComments);
+
+    document.getElementById('send').addEventListener('click', async () => {
+      const name = document.getElementById('name').value.trim();
+      const comment = document.getElementById('comment').value.trim();
+      if (name && comment) {
+        await fetch('/comments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, comment })
+        });
+        document.getElementById('name').value = '';
+        document.getElementById('comment').value = '';
+        loadComments();
+      }
+    });
+  </script>
+</body>
+</html>
