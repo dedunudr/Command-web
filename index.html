@@ -1,73 +1,220 @@
 <!DOCTYPE html>
-<html lang="en" class="bg-gray-100">
+<html lang="en" class="h-full bg-gradient-to-br from-purple-700 via-indigo-800 to-blue-900">
 <head>
   <meta charset="UTF-8" />
-  <title>Save Comments</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Save Comments with Reply</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          animation: {
-            fade: 'fadeIn 1s ease-in-out',
-            bounceIn: 'bounceIn 0.8s ease-in-out'
-          },
-          keyframes: {
-            fadeIn: {
-              '0%': { opacity: '0' },
-              '100%': { opacity: '1' },
-            },
-            bounceIn: {
-              '0%': { transform: 'scale(0.5)', opacity: 0 },
-              '100%': { transform: 'scale(1)', opacity: 1 },
-            },
-          }
-        }
+  <style>
+    /* Animations */
+    @keyframes fadeInUp {
+      0% {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0);
       }
     }
-  </script>
+    .fadeInUp {
+      animation: fadeInUp 0.5s ease forwards;
+    }
+    .reply-input {
+      transition: max-height 0.3s ease, opacity 0.3s ease;
+      max-height: 0;
+      opacity: 0;
+      overflow: hidden;
+    }
+    .reply-input.open {
+      max-height: 100px;
+      opacity: 1;
+      margin-top: 0.5rem;
+    }
+  </style>
 </head>
-<body class="p-10 animate-fade">
-  <h1 class="text-3xl font-bold mb-6 text-blue-600 animate-bounceIn">💬 Save Comments</h1>
-  <div class="mb-4 space-x-2 animate-fade">
-    <input id="name" type="text" placeholder="Enter your name" class="border p-2 rounded shadow" />
-    <input id="comment" type="text" placeholder="Enter your comment" class="border p-2 rounded shadow" />
-    <button id="send" class="bg-blue-600 hover:bg-blue-800 text-white p-2 rounded transition-all duration-300">
-      Send
-    </button>
+<body class="h-full flex items-center justify-center p-6">
+  <div
+    class="bg-white/90 max-w-xl w-full rounded-xl shadow-2xl p-8 space-y-6
+           backdrop-blur-md border border-white/20"
+  >
+    <h1
+      class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-red-500 to-yellow-500
+             animate-[fadeInUp_1s_ease_forwards]"
+    >
+      💬 Save Comments
+    </h1>
+
+    <form
+      id="commentForm"
+      class="flex flex-col sm:flex-row gap-4 items-center animate-[fadeInUp_1.3s_ease_forwards]"
+      onsubmit="return false;"
+    >
+      <input
+        id="name"
+        type="text"
+        placeholder="Enter your name"
+        class="flex-1 border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-pink-500 transition"
+        required
+      />
+      <input
+        id="comment"
+        type="text"
+        placeholder="Enter your comment"
+        class="flex-1 border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-pink-500 transition"
+        required
+      />
+      <button
+        id="send"
+        type="submit"
+        class="bg-pink-600 hover:bg-pink-700 text-white px-6 py-3 rounded-lg font-semibold shadow-md transition"
+      >
+        Send
+      </button>
+    </form>
+
+    <ul
+      id="comments"
+      class="max-h-[400px] overflow-y-auto space-y-4 bg-gray-50 rounded-lg p-4 shadow-inner"
+    ></ul>
   </div>
-  <ul id="comments" class="list-inside list-disc p-4 mt-4 bg-white rounded shadow space-y-1 animate-fade">
-  </ul>
 
   <script>
-    async function loadComments() {
-      const res = await fetch('/comments');
-      const comments = await res.json();
+    // For managing comments and replies
+    let commentsData = JSON.parse(localStorage.getItem('comments')) || [];
+
+    function createCommentElement({ name, comment, replies = [] }, index) {
+      const li = document.createElement('li');
+      li.className =
+        'bg-white rounded-lg p-4 shadow-md relative animate-[fadeInUp_0.5s_ease_forwards]';
+
+      // Comment content container
+      const contentDiv = document.createElement('div');
+      contentDiv.innerHTML = `<strong class="text-pink-600">${escapeHTML(
+        name
+      )}</strong>: <span>${escapeHTML(comment)}</span>`;
+
+      // Reply button
+      const replyBtn = document.createElement('button');
+      replyBtn.textContent = 'Reply';
+      replyBtn.className =
+        'text-sm text-blue-600 hover:underline ml-4 focus:outline-none';
+
+      // Reply input container
+      const replyContainer = document.createElement('div');
+      replyContainer.className = 'reply-input';
+
+      // Reply input field
+      const replyInput = document.createElement('input');
+      replyInput.type = 'text';
+      replyInput.placeholder = 'Write a reply...';
+      replyInput.className =
+        'w-full border border-gray-300 rounded-md p-2 mt-1 focus:outline-none focus:ring-2 focus:ring-blue-400 transition';
+
+      // Submit reply button
+      const submitReplyBtn = document.createElement('button');
+      submitReplyBtn.textContent = 'Send Reply';
+      submitReplyBtn.className =
+        'mt-2 px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition';
+
+      replyContainer.appendChild(replyInput);
+      replyContainer.appendChild(submitReplyBtn);
+
+      // Toggle reply input on reply button click
+      replyBtn.addEventListener('click', () => {
+        replyContainer.classList.toggle('open');
+        if (replyContainer.classList.contains('open')) {
+          replyInput.focus();
+        }
+      });
+
+      // Submit reply handler
+      submitReplyBtn.addEventListener('click', () => {
+        const replyText = replyInput.value.trim();
+        if (!replyText) return alert('Reply cannot be empty!');
+        // Add reply to data
+        commentsData[index].replies.push({
+          name: 'Anonymous',
+          comment: replyText,
+        });
+        saveComments();
+        loadComments();
+      });
+
+      contentDiv.appendChild(replyBtn);
+      li.appendChild(contentDiv);
+      li.appendChild(replyContainer);
+
+      // Replies list
+      if (replies.length > 0) {
+        const replyList = document.createElement('ul');
+        replyList.className = 'pl-6 mt-3 space-y-2';
+
+        replies.forEach(({ name, comment }) => {
+          const replyLi = document.createElement('li');
+          replyLi.className =
+            'bg-blue-50 rounded-md p-2 shadow-sm text-gray-700 animate-[fadeInUp_0.5s_ease_forwards]';
+          replyLi.innerHTML = `<strong class="text-blue-700">${escapeHTML(
+            name
+          )}</strong>: ${escapeHTML(comment)}`;
+          replyList.appendChild(replyLi);
+        });
+        li.appendChild(replyList);
+      }
+
+      return li;
+    }
+
+    function loadComments() {
       const ul = document.getElementById('comments');
       ul.innerHTML = '';
-      comments.forEach(({ name, comment }) => {
-        const li = document.createElement('li');
-        li.textContent = `${name}: ${comment}`;
-        ul.appendChild(li);
+      commentsData.forEach((commentObj, idx) => {
+        ul.appendChild(createCommentElement(commentObj, idx));
       });
     }
 
-    document.addEventListener('DOMContentLoaded', loadComments);
+    function saveComments() {
+      localStorage.setItem('comments', JSON.stringify(commentsData));
+    }
 
-    document.getElementById('send').addEventListener('click', async () => {
-      const name = document.getElementById('name').value.trim();
-      const comment = document.getElementById('comment').value.trim();
-      if (name && comment) {
-        await fetch('/comments', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, comment })
-        });
-        document.getElementById('name').value = '';
-        document.getElementById('comment').value = '';
-        loadComments();
+    // Escape HTML to prevent XSS
+    function escapeHTML(str) {
+      return str.replace(
+        /[&<>"']/g,
+        (tag) =>
+          ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;',
+          }[tag] || tag)
+      );
+    }
+
+    // Form submission
+    document.getElementById('commentForm').addEventListener('submit', () => {
+      const nameInput = document.getElementById('name');
+      const commentInput = document.getElementById('comment');
+      const name = nameInput.value.trim();
+      const comment = commentInput.value.trim();
+
+      if (!name || !comment) {
+        alert('Please enter both name and comment.');
+        return;
       }
+
+      commentsData.push({ name, comment, replies: [] });
+      saveComments();
+      loadComments();
+
+      // Clear inputs
+      nameInput.value = '';
+      commentInput.value = '';
     });
+
+    // Load on page ready
+    document.addEventListener('DOMContentLoaded', loadComments);
   </script>
 </body>
-</html>
+</html> 
